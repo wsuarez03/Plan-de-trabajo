@@ -369,6 +369,20 @@ export default function AssignmentPanel({
       alert(
         'Asignaciones actualizadas'
       );
+                
+          // =========================
+          // LIMPIAR FORMULARIO
+          // =========================
+          
+          setSelectedWorker('');
+          
+          setSelectedClient('');
+          
+          setSelectedProject('');
+          
+          setSelectedDates([]);
+        
+
     };
 
   return (
