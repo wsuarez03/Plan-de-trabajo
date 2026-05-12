@@ -22,11 +22,14 @@ interface Props {
 
 export default function ProjectManager({
 
+  projects,
   setProjects,
   editingProject,
   setEditingProject
 
-}: Props) {
+}: Props)
+
+ {
 
   const [information, setInformation] =
     useState('');
