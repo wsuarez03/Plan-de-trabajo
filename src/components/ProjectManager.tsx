@@ -40,43 +40,46 @@ export default function ProjectManager({
   const [endDate, setEndDate] =
     useState('');
 
-    
+      
       // =========================
-      // GENERAR COLOR ALEATORIO
+      // PALETA ORDENADA
       // =========================
       
-      const generateRandomColor = () => {
+      const projectColors = [
       
-        const colors = [
+        '#2563eb', // azul
+        '#dc2626', // rojo
+        '#16a34a', // verde
+        '#9333ea', // morado
+        '#ea580c', // naranja
+        '#0891b2', // cyan
+        '#be123c', // rosado
+        '#65a30d', // lima
+        '#7c3aed', // violeta
+        '#0f766e', // teal
+        '#c2410c', // naranja oscuro
+        '#1d4ed8', // azul fuerte
+        '#15803d', // verde oscuro
+        '#b91c1c', // rojo oscuro
+        '#7e22ce', // púrpura
+        '#0369a1'  // azul petróleo
+      ];
       
-          '#2563eb',
-          '#dc2626',
-          '#16a34a',
-          '#9333ea',
-          '#ea580c',
-          '#0891b2',
-          '#be123c',
-          '#65a30d',
-          '#7c3aed',
-          '#0f766e',
-          '#c2410c',
-          '#1d4ed8',
-          '#15803d',
-          '#b91c1c',
-          '#7e22ce',
-          '#0369a1'
-        ];
+      // =========================
+      // COLOR AUTOMÁTICO ORDENADO
+      // =========================
       
-        return colors[
-          Math.floor(
-            Math.random() * colors.length
-          )
+      const getNextColor = () => {
+      
+        return projectColors[
+          projects.length %
+          projectColors.length
         ];
       };
       
       const [color, setColor] =
-        useState(generateRandomColor());
-
+        useState(getNextColor());
+      
 
   // =========================
   // CARGAR DATOS AL EDITAR
@@ -103,8 +106,8 @@ export default function ProjectManager({
       );
 
       setColor(
-        editingProject.color ||
-        generateRandomColor()
+        editingProject.color || 
+        getNextColor()
       );
     }
 
@@ -239,7 +242,7 @@ export default function ProjectManager({
     setEndDate('');
 
     // nuevo color automático
-    setColor(generateRandomColor());
+    setColor(getNextColor());
   };
 
   return (
