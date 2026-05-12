@@ -1,0 +1,858 @@
+﻿import { useState, useEffect } from 'react'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import { parseISO, format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import './App.css'
+
+type Worker = { id: string; name: string }
+type Project = { id: string; name: string; startDate: string; endDate: string }
+type Assignment = { workerId: string; projectId: string; date: string }
+
+function App() {
+  const [workers, setWorkers] = useState<Worker[]>(() => {
+    const saved = localStorage.getItem('workers')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const saved = localStorage.getItem('projects')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [assignments, setAssignments] = useState<Assignment[]>(() => {
+    const saved = localStorage.getItem('assignments')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('workers', JSON.stringify(workers))
+  }, [workers])
+
+  useEffect(() => {
+    localStorage.setItem('projects', JSON.stringify(projects))
+  }, [projects])
+
+  useEffect(() => {
+    localStorage.setItem('assignments', JSON.stringify(assignments))
+  }, [assignments])
+
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([])
+  const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [useCustomDates, setUseCustomDates] = useState(false)
+  const [eventTooltip, setEventTooltip] = useState({ visible: false, x: 0, y: 0, content: '' })
+  const [expandedProject, setExpandedProject] = useState<string>('')
+  const [editingProjectId, setEditingProjectId] = useState<string>('')
+  const [editingDates, setEditingDates] = useState({ startDate: '', endDate: '' })
+  const [showWorkerModal, setShowWorkerModal] = useState(false)
+  const [showProjectModal, setShowProjectModal] = useState(false)
+  const [modalWorkerName, setModalWorkerName] = useState('')
+  const [modalProjectName, setModalProjectName] = useState('')
+  const [modalProjectStartDate, setModalProjectStartDate] = useState('')
+  const [modalProjectEndDate, setModalProjectEndDate] = useState('')
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false)
+  const [editProjectData, setEditProjectData] = useState<{ startDate: string; endDate: string }>({ startDate: '', endDate: '' })
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showExpandModal, setShowExpandModal] = useState(false)
+  const [expandProjectData, setExpandProjectData] = useState<{ name: string; startDate: string; endDate: string; workers: string[] } | null>(null)
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const eventEl = target.closest('.fc-event')
+
+      if (eventEl) {
+        // Mouse está sobre un evento
+        const rect = eventEl.getBoundingClientRect()
+        const x = rect.left + (rect.width / 2) - 100
+        const y = rect.top - 50
+
+        // Leer información de los data attributes
+        const projectId = eventEl.getAttribute('data-project-id')
+        const date = eventEl.getAttribute('data-date')
+
+        if (projectId && date) {
+          const assignedWorkers = assignments.filter(a => a.projectId === projectId && a.date === date)
+          const workerNames = assignedWorkers
+            .map(a => workers.find(w => w.id === a.workerId)?.name)
+            .filter((name): name is string => Boolean(name))
+
+          setEventTooltip({
+            visible: true,
+            x: Math.max(10, Math.min(x, window.innerWidth - 200)),
+            y: Math.max(10, y),
+            content: workerNames.length > 0 ? workerNames.join('\n') : 'Sin trabajadores asignados'
+          })
+          return
+        }
+      }
+
+      // Mouse no está sobre ningún evento
+      setEventTooltip({ visible: false, x: 0, y: 0, content: '' })
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    return () => document.removeEventListener('mousemove', handleMouseMove)
+  }, [assignments, workers])
+
+  const addWorker = (name: string) => {
+    if (name.trim()) {
+      setWorkers([...workers, { id: Date.now().toString(), name: name.trim() }])
+    }
+  }
+
+  const removeWorker = (id: string) => {
+    setWorkers(workers.filter(w => w.id !== id))
+    setAssignments(assignments.filter(a => a.workerId !== id))
+  }
+
+  const addProject = (name: string, startDate: string, endDate: string) => {
+    if (name.trim() && startDate && endDate) {
+      setProjects([...projects, { id: Date.now().toString(), name: name.trim(), startDate, endDate }])
+    }
+  }
+
+  const deleteProject = (id: string) => {
+    setProjects(projects.filter(p => p.id !== id))
+    setAssignments(assignments.filter(a => a.projectId !== id))
+    if (selectedProjectId === id) {
+      setSelectedProjectId('')
+      setSelectedWorkerIds([])
+    }
+  }
+
+  const startEditProject = (project: Project) => {
+    setEditingProjectId(project.id)
+    setEditingDates({ startDate: project.startDate, endDate: project.endDate })
+    setShowEditProjectModal(true)
+  }
+
+  const saveEditProject = () => {
+    if (!editingProjectId || !editingDates.startDate || !editingDates.endDate) return
+    
+    // Obtener el proyecto antes de actualizar
+    const project = projects.find(p => p.id === editingProjectId)
+    if (!project) return
+    
+    const oldDates = getDatesBetween(project.startDate, project.endDate)
+    const newDates = getDatesBetween(editingDates.startDate, editingDates.endDate)
+    
+    // Actualizar las asignaciones del proyecto a las nuevas fechas
+    if (oldDates.length === newDates.length) {
+      // Mismo número de días: mapear fechas una a una
+      setAssignments(prev => prev.map(a => {
+        if (a.projectId === editingProjectId) {
+          const oldIndex = oldDates.indexOf(a.date)
+          if (oldIndex !== -1) {
+            return { ...a, date: newDates[oldIndex] }
+          }
+        }
+        return a
+      }))
+    } else {
+      // Diferente número de días: eliminar asignaciones fuera del nuevo rango
+      setAssignments(prev => prev.filter(a => {
+        if (a.projectId === editingProjectId) {
+          return newDates.includes(a.date)
+        }
+        return true
+      }))
+    }
+    
+    setProjects(projects.map(p => 
+      p.id === editingProjectId 
+        ? { ...p, startDate: editingDates.startDate, endDate: editingDates.endDate }
+        : p
+    ))
+    setEditingProjectId('')
+    setEditingDates({ startDate: '', endDate: '' })
+  }
+
+  const cancelEditProject = () => {
+    setEditingProjectId('')
+    setEditingDates({ startDate: '', endDate: '' })
+  }
+
+  const assign = (workerId: string, projectId: string, date: string) => {
+    if (assignments.some(a => a.workerId === workerId && a.date === date)) {
+      alert('Trabajador ya asignado en esta fecha')
+      return
+    }
+    setAssignments(prev => [...prev, { workerId, projectId, date }])
+  }
+
+  const getWorkerAvailabilityStatus = (workerId: string, dates: string[]) => {
+    if (dates.length === 0) return 'available' // Verde si no hay fechas seleccionadas
+
+    const hasConflict = dates.some(date => assignments.some(a => a.workerId === workerId && a.date === date))
+    if (hasConflict) return 'unavailable' // Rojo
+
+    const hasRecentProject = dates.some(date => {
+      const previousDay = new Date(date)
+      previousDay.setDate(previousDay.getDate() - 1)
+      const prevDateStr = previousDay.toISOString().split('T')[0]
+      return assignments.some(a => a.workerId === workerId && a.date === prevDateStr)
+    })
+
+    if (hasRecentProject) return 'warning' // Amarillo
+
+    return 'available' // Verde
+  }
+
+  const getDatesBetween = (startDate: string, endDate: string): string[] => {
+    const dates: string[] = []
+    const currentDate = new Date(startDate)
+    const end = new Date(endDate)
+    while (currentDate <= end) {
+      dates.push(currentDate.toISOString().split('T')[0])
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+    return dates
+  }
+
+  const toggleWorkerSelection = (workerId: string) => {
+    setSelectedWorkerIds(prev =>
+      prev.includes(workerId) ? prev.filter(id => id !== workerId) : [...prev, workerId]
+    )
+  }
+
+  const handleEventDidMount = (info: any) => {
+    // Agregar data attributes para fácil acceso
+    info.el.setAttribute('data-project-id', info.event.extendedProps.projectId)
+    info.el.setAttribute('data-date', info.event.extendedProps.date)
+  }
+
+  const events = [
+    ...projects.flatMap(p => {
+      const dates = getDatesBetween(p.startDate, p.endDate)
+      return dates.map(date => {
+        const assignedWorkers = assignments.filter(a => a.projectId === p.id && a.date === date)
+        const workerNames = assignedWorkers
+          .map(a => workers.find(w => w.id === a.workerId)?.name)
+          .filter((name): name is string => Boolean(name))
+
+        return {
+          title: `${p.name}${workerNames.length > 0 ? ` (${workerNames.length})` : ''}`,
+          start: date,
+          backgroundColor: '#3498db',
+          borderColor: '#2980b9',
+          textColor: '#fff',
+          extendedProps: {
+            projectId: p.id,
+            workerNames,
+            date
+          }
+        }
+      })
+    })
+  ]
+
+  return (
+    <div>
+      <div className="app-header">
+        <h1>Planificación de Recursos</h1>
+        <p>Gestiona trabajadores y proyectos de forma intuitiva</p>
+      </div>
+
+      <div className="sections-container">
+        <div className="section">
+          <h2>Trabajadores</h2>
+          <button onClick={() => setShowWorkerModal(true)} style={{width: '100%', padding: '0.75rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600'}}>+ Agregar Trabajador</button>
+          <ul className="item-list">
+            {workers.length > 0 ? (
+              workers.map(w => (
+                <li key={w.id}>
+                  <span>{w.name}</span>
+                  <button className="delete-btn" onClick={() => removeWorker(w.id)}>Eliminar</button>
+                </li>
+              ))
+            ) : (
+              <li className="empty-state">Sin trabajadores</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="section">
+          <h2>Proyectos</h2>
+          <button onClick={() => setShowProjectModal(true)} style={{width: '100%', padding: '0.75rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600'}}>+ Agregar Proyecto</button>
+          <ul className="item-list">
+            {projects.length > 0 ? (
+              projects.map(p => (
+                <li key={p.id}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%'}}>
+                    <span><strong>{p.name}</strong></span>
+                    <div style={{display: 'flex', gap: '0.5rem'}}>
+                      <button className="edit-btn" onClick={() => startEditProject(p)} style={{padding: '0.4rem 0.8rem', fontSize: '0.85em'}}>Editar</button>
+                      <button className="delete-btn" onClick={() => deleteProject(p.id)} style={{padding: '0.4rem 0.8rem', fontSize: '0.85em'}}>Eliminar</button>
+                    </div>
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li className="empty-state">Sin proyectos</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="section">
+          <h2>Asignación</h2>
+          <button onClick={() => {
+            if (!selectedProjectId) {
+              alert('Por favor selecciona un proyecto primero')
+              return
+            }
+            setShowAssignModal(true)
+          }} style={{width: '100%', padding: '0.75rem', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600'}}>Abrir Asignación</button>
+          {selectedProjectId && (
+            <p style={{marginTop: '0.5rem', fontSize: '0.9em', color: '#666'}}>
+              Proyecto seleccionado: <strong>{projects.find(p => p.id === selectedProjectId)?.name}</strong>
+            </p>
+          )}
+        </div>
+
+        <div className="section">
+          <h2>Resumen por Proyectos</h2>
+          <ul className="item-list">
+            {projects.length > 0 ? (
+                      setUseCustomDates(e.target.checked)
+                      if (e.target.checked) {
+                        // Cuando se marca, seleccionar automáticamente todas las fechas del proyecto
+                        const project = projects.find(p => p.id === selectedProjectId)
+                        if (project) {
+                          const projectDates = getDatesBetween(project.startDate, project.endDate)
+                          setSelectedDates(projectDates)
+                        }
+                      } else {
+                        setSelectedDates([])
+                      }
+                    }}
+                  />
+                  Seleccionar fechas especificas (opcional)
+                </label>
+              </div>
+
+              {useCustomDates && (
+                <>
+                  <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fechas seleccionadas:</label>
+                  <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', padding: '0.5rem', borderRadius: '4px', backgroundColor: '#f8f9fa'}}>
+                    {(() => {
+                      const project = projects.find(p => p.id === selectedProjectId)
+                      if (!project) return null
+                      const projectDates = getDatesBetween(project.startDate, project.endDate)
+                      return projectDates.map(date => (
+                        <label key={date} style={{display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.9em'}}>
+                          <input
+                            type="checkbox"
+                            checked={selectedDates.includes(date)}
+                            onChange={() => {
+                              setSelectedDates(prev =>
+                                prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]
+                              )
+                            }}
+                          />
+                          {format(parseISO(date), 'eee d', { locale: es })}
+                        </label>
+                      ))
+                    })()}
+                  </div>
+                  <p style={{fontSize: '0.8em', color: '#666', marginTop: '0.25rem'}}>
+                    Todas las fechas del proyecto están marcadas. Puedes desmarcar las que no necesites.
+                  </p>
+                </>
+              )}
+
+              {!useCustomDates && (
+                <div style={{padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #ddd'}}>
+                  <p style={{margin: 0, fontSize: '0.9em', color: '#666'}}>
+                    <strong>Nota:</strong> Sin fechas marcadas, se asignarán a todas las fechas del proyecto automáticamente.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="checkbox-group">
+            {workers.length > 0 ? workers.map(w => {
+              const datesToCheck = useCustomDates && selectedDates.length > 0 ? selectedDates : (() => {
+                const project = projects.find(p => p.id === selectedProjectId)
+                return project ? getDatesBetween(project.startDate, project.endDate) : []
+              })()
+              const status = getWorkerAvailabilityStatus(w.id, datesToCheck)
+              const isAvailable = status === 'available'
+              const statusText = status === 'available' ? 'Disponible' : status === 'unavailable' ? 'No disponible' : 'Recientemente terminó un proyecto'
+              const statusColor = status === 'available' ? '#28a745' : status === 'unavailable' ? '#dc3545' : '#ffc107'
+
+              return (
+                <div key={w.id} className="checkbox-item" style={{position: 'relative'}}>
+                  <input
+                    type="checkbox"
+                    id={`worker-${w.id}`}
+                    checked={selectedWorkerIds.includes(w.id)}
+                    onChange={() => toggleWorkerSelection(w.id)}
+                    disabled={!isAvailable}
+                  />
+                  <label htmlFor={`worker-${w.id}`} style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                    <span style={{position: 'relative'}}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          backgroundColor: statusColor,
+                          cursor: 'help'
+                        }}
+                      ></span>
+                      <div className="traffic-light-tooltip">
+                        {statusText}
+                      </div>
+                    </span>
+                    <span style={{opacity: isAvailable ? 1 : 0.6}}>{w.name}</span>
+                  </label>
+                </div>
+              )
+            }) : (
+              <p className="empty-state">Sin trabajadores</p>
+            )}
+          </div>
+          <button style={{marginTop: '1rem', width: '100%', padding: '0.75rem', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: '600', transition: 'background-color 0.2s'}} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2980b9'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3498db'} onClick={() => {
+            if (!selectedProjectId) return
+            if (selectedWorkerIds.length === 0) return
+
+            const datesToAssign = useCustomDates && selectedDates.length > 0 ? selectedDates : (() => {
+              const project = projects.find(p => p.id === selectedProjectId)
+              return project ? getDatesBetween(project.startDate, project.endDate) : []
+            })()
+
+            if (datesToAssign.length === 0) return
+
+            // Verificar que todos los trabajadores seleccionados estén disponibles en las fechas seleccionadas
+            const unavailableWorkers = selectedWorkerIds.filter(workerId =>
+              datesToAssign.some(date => assignments.some(a => a.workerId === workerId && a.date === date))
+            )
+
+            if (unavailableWorkers.length > 0) {
+              const workerNames = unavailableWorkers.map(id => workers.find(w => w.id === id)?.name).join(', ')
+              alert(`Los siguientes trabajadores no están disponibles en las fechas seleccionadas: ${workerNames}`)
+              return
+            }
+
+            selectedWorkerIds.forEach(workerId => {
+              datesToAssign.forEach(date => assign(workerId, selectedProjectId, date))
+            })
+            setSelectedWorkerIds([])
+            if (useCustomDates) setSelectedDates([])
+          }}>Asignar</button>
+        </div>
+
+        <div className="section">
+          <h2>Resumen por Proyectos</h2>
+          <ul className="item-list">
+            {projects.length > 0 ? (
+              projects.map(p => {
+                const projectAssignments = assignments.filter(a => a.projectId === p.id)
+                const uniqueWorkers = Array.from(new Set(projectAssignments.map(a => a.workerId)))
+                  .map(workerId => workers.find(w => w.id === workerId)?.name)
+                  .filter((name): name is string => Boolean(name))
+                const isExpanded = expandedProject === p.id
+
+                return (
+                  <li key={p.id} style={{paddingBottom: '1rem', borderBottom: '1px solid #ecf0f1'}}>
+                    <div>
+                      <strong style={{fontSize: '1.1em'}}>{p.name}</strong>
+                      <div style={{fontSize: '0.9em', color: '#666', marginTop: '0.5rem'}}>
+                        Desde {format(parseISO(p.startDate), 'dd/MM/yyyy', { locale: es })} hasta {format(parseISO(p.endDate), 'dd/MM/yyyy', { locale: es })}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setExpandProjectData({
+                            name: p.name,
+                            startDate: p.startDate,
+                            endDate: p.endDate,
+                            workers: uniqueWorkers
+                          })
+                          setShowExpandModal(true)
+                        }}
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.4rem 0.8rem',
+                          backgroundColor: '#3498db',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.85em',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2980b9'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3498db'}
+                      >
+                        ▶ Ver más
+                      </button>
+                    </div>
+                  </li>
+                )
+              })
+            ) : (
+              <li className="empty-state">Sin proyectos</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="section">
+          <h2>Personal Disponible</h2>
+          <ul className="item-list">
+            {workers.length > 0 ? (
+              workers
+                .filter(w => {
+                  // Un trabajador está disponible si no tiene asignaciones en las fechas actuales
+                  const today = new Date().toISOString().split('T')[0]
+                  return !assignments.some(a => a.workerId === w.id && a.date >= today)
+                })
+                .map(w => (
+                  <li key={w.id}>
+                    <span>{w.name}</span>
+                  </li>
+                ))
+            ) : (
+              <li className="empty-state">Sin trabajadores</li>
+            )}
+            {workers.filter(w => {
+              const today = new Date().toISOString().split('T')[0]
+              return !assignments.some(a => a.workerId === w.id && a.date >= today)
+            }).length === 0 && workers.length > 0 && (
+              <li className="empty-state">Todos los trabajadores están asignados</li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <div className="calendar-container">
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          events={events}
+          eventDidMount={handleEventDidMount}
+        />
+      </div>
+      {eventTooltip.visible && (
+        <div className="tooltip" style={{ left: eventTooltip.x, top: eventTooltip.y }}>
+          {eventTooltip.content}
+        </div>
+      )}
+
+      {/* Modal Agregar Trabajador */}
+      {showWorkerModal && (
+        <div className="modal-overlay" onClick={() => setShowWorkerModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Agregar Trabajador</h2>
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Nombre:</label>
+              <input 
+                type="text" 
+                value={modalWorkerName}
+                onChange={(e) => setModalWorkerName(e.target.value)}
+                placeholder="Nombre del trabajador"
+                style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem'}}
+                autoFocus
+              />
+            </div>
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+              <button onClick={() => setShowWorkerModal(false)} style={{padding: '0.75rem 1.5rem', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Cancelar</button>
+              <button onClick={() => {
+                if (modalWorkerName.trim()) {
+                  addWorker(modalWorkerName)
+                  setModalWorkerName('')
+                  setShowWorkerModal(false)
+                }
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Agregar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agregar Proyecto */}
+      {showProjectModal && (
+        <div className="modal-overlay" onClick={() => setShowProjectModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Agregar Proyecto</h2>
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Nombre:</label>
+              <input 
+                type="text" 
+                value={modalProjectName}
+                onChange={(e) => setModalProjectName(e.target.value)}
+                placeholder="Nombre del proyecto"
+                style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', marginBottom: '1rem'}}
+                autoFocus
+              />
+            </div>
+            <div style={{display: 'flex', gap: '1rem', marginBottom: '1rem'}}>
+              <div style={{flex: 1}}>
+                <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fecha Inicio:</label>
+                <input 
+                  type="date" 
+                  value={modalProjectStartDate}
+                  onChange={(e) => setModalProjectStartDate(e.target.value)}
+                  style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem'}}
+                />
+              </div>
+              <div style={{flex: 1}}>
+                <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fecha Fin:</label>
+                <input 
+                  type="date" 
+                  value={modalProjectEndDate}
+                  onChange={(e) => setModalProjectEndDate(e.target.value)}
+                  style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem'}}
+                />
+              </div>
+            </div>
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+              <button onClick={() => {
+                setShowProjectModal(false)
+                setModalProjectName('')
+                setModalProjectStartDate('')
+                setModalProjectEndDate('')
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Cancelar</button>
+              <button onClick={() => {
+                if (modalProjectName.trim() && modalProjectStartDate && modalProjectEndDate) {
+                  addProject(modalProjectName, modalProjectStartDate, modalProjectEndDate)
+                  setModalProjectName('')
+                  setModalProjectStartDate('')
+                  setModalProjectEndDate('')
+                  setShowProjectModal(false)
+                }
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Agregar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Proyecto */}
+      {showEditProjectModal && editingProjectId && (
+        <div className="modal-overlay" onClick={() => setShowEditProjectModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Editar Fechas del Proyecto</h2>
+            <p style={{marginBottom: '1rem', color: '#666'}}>
+              Proyecto: <strong>{projects.find(p => p.id === editingProjectId)?.name}</strong>
+            </p>
+            <div style={{display: 'flex', gap: '1rem', marginBottom: '1rem'}}>
+              <div style={{flex: 1}}>
+                <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fecha Inicio:</label>
+                <input 
+                  type="date" 
+                  value={editingDates.startDate}
+                  onChange={(e) => setEditingDates({...editingDates, startDate: e.target.value})}
+                  style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem'}}
+                />
+              </div>
+              <div style={{flex: 1}}>
+                <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fecha Fin:</label>
+                <input 
+                  type="date" 
+                  value={editingDates.endDate}
+                  onChange={(e) => setEditingDates({...editingDates, endDate: e.target.value})}
+                  style={{width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem'}}
+                />
+              </div>
+            </div>
+            <p style={{fontSize: '0.85em', color: '#e74c3c', marginBottom: '1rem'}}>
+              ⚠️ Al modificar las fechas, las asignaciones de trabajadores se ajustarán automáticamente.
+            </p>
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
+              <button onClick={() => {
+                setShowEditProjectModal(false)
+                setEditingProjectId('')
+                setEditingDates({ startDate: '', endDate: '' })
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Cancelar</button>
+              <button onClick={() => {
+                saveEditProject()
+                setShowEditProjectModal(false)
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Ver más (Resumen de Proyectos) */}
+      {showExpandModal && expandProjectData && (
+        <div className="modal-overlay" onClick={() => setShowExpandModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>{expandProjectData.name}</h2>
+            <p style={{marginBottom: '1rem', color: '#666', fontSize: '1.1em'}}>
+              📅 <strong>Período:</strong> {format(parseISO(expandProjectData.startDate), 'dd/MM/yyyy', { locale: es })} - {format(parseISO(expandProjectData.endDate), 'dd/MM/yyyy', { locale: es })}
+            </p>
+            <div style={{marginTop: '1.5rem'}}>
+              <h3 style={{color: 'var(--primary)', marginBottom: '1rem'}}>Personal Asignado:</h3>
+              {expandProjectData.workers.length > 0 ? (
+                <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
+                  {expandProjectData.workers.map((workerName, idx) => (
+                    <li key={idx} style={{padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                      <span style={{width: '8px', height: '8px', backgroundColor: '#27ae60', borderRadius: '50%'}}></span>
+                      {workerName}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{color: '#95a5a6', fontStyle: 'italic', textAlign: 'center', padding: '2rem'}}>
+                  No hay personal asignado a este proyecto
+                </p>
+              )}
+            </div>
+            <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem'}}>
+              <button onClick={() => {
+                setShowExpandModal(false)
+                setExpandProjectData(null)
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Asignación */}
+      {showAssignModal && selectedProjectId && (
+        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{maxWidth: '600px'}}>
+            <h2>Asignar Personal</h2>
+            <p style={{marginBottom: '1rem', color: '#666'}}>
+              Proyecto: <strong>{projects.find(p => p.id === selectedProjectId)?.name}</strong>
+            </p>
+            
+            <div style={{marginBottom: '1rem'}}>
+              <label style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600'}}>
+                <input
+                  type="checkbox"
+                  checked={useCustomDates}
+                  onChange={(e) => {
+                    setUseCustomDates(e.target.checked)
+                    if (e.target.checked) {
+                      const project = projects.find(p => p.id === selectedProjectId)
+                      if (project) {
+                        const projectDates = getDatesBetween(project.startDate, project.endDate)
+                        setSelectedDates(projectDates)
+                      }
+                    } else {
+                      setSelectedDates([])
+                    }
+                  }}
+                />
+                Seleccionar fechas específicas
+              </label>
+            </div>
+
+            {useCustomDates && (
+              <>
+                <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Fechas:</label>
+                <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #ddd', padding: '0.5rem', borderRadius: '8px', backgroundColor: '#f8f9fa', marginBottom: '1rem'}}>
+                  {(() => {
+                    const project = projects.find(p => p.id === selectedProjectId)
+                    if (!project) return null
+                    const projectDates = getDatesBetween(project.startDate, project.endDate)
+                    return projectDates.map(date => (
+                      <label key={date} style={{display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.85em'}}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDates.includes(date)}
+                          onChange={() => {
+                            setSelectedDates(prev =>
+                              prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]
+                            )
+                          }}
+                        />
+                        {format(parseISO(date), 'dd MMM', { locale: es })}
+                      </label>
+                    ))
+                  })()}
+                </div>
+              </>
+            )}
+
+            {!useCustomDates && (
+              <div style={{padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '8px', marginBottom: '1rem'}}>
+                <p style={{margin: 0, fontSize: '0.9em', color: '#2e7d32'}}>
+                  📋 Se asignará a todas las fechas del proyecto automáticamente.
+                </p>
+              </div>
+            )}
+
+            <label style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600'}}>Seleccionar trabajadores:</label>
+            <div style={{maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '8px', padding: '0.5rem'}}>
+              {workers.length > 0 ? workers.map(w => {
+                const datesToCheck = useCustomDates && selectedDates.length > 0 ? selectedDates : (() => {
+                  const project = projects.find(p => p.id === selectedProjectId)
+                  return project ? getDatesBetween(project.startDate, project.endDate) : []
+                })()
+                const status = getWorkerAvailabilityStatus(w.id, datesToCheck)
+                const isAvailable = status === 'available'
+                const statusText = status === 'available' ? 'Disponible' : status === 'unavailable' ? 'No disponible' : 'Terminó proyecto recientemente'
+                const statusColor = status === 'available' ? '#28a745' : status === 'unavailable' ? '#dc3545' : '#ffc107'
+
+                return (
+                  <div key={w.id} style={{display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', borderBottom: '1px solid #eee'}}>
+                    <input
+                      type="checkbox"
+                      id={`modal-worker-${w.id}`}
+                      checked={selectedWorkerIds.includes(w.id)}
+                      onChange={() => toggleWorkerSelection(w.id)}
+                      disabled={!isAvailable}
+                    />
+                    <label htmlFor={`modal-worker-${w.id}`} style={{display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, cursor: isAvailable ? 'pointer' : 'not-allowed'}}>
+                      <span style={{width: '10px', height: '10px', borderRadius: '50%', backgroundColor: statusColor}}></span>
+                      <span style={{opacity: isAvailable ? 1 : 0.5}}>{w.name}</span>
+                    </label>
+                    <span style={{fontSize: '0.75em', color: statusColor}}>{statusText}</span>
+                  </div>
+                )
+              }) : (
+                <p style={{textAlign: 'center', color: '#95a5a6', padding: '1rem'}}>No hay trabajadores</p>
+              )}
+            </div>
+
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem'}}>
+              <button onClick={() => {
+                setShowAssignModal(false)
+                setSelectedWorkerIds([])
+                setSelectedDates([])
+                setUseCustomDates(false)
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Cancelar</button>
+              <button onClick={() => {
+                if (selectedWorkerIds.length === 0) {
+                  alert('Por favor selecciona al menos un trabajador')
+                  return
+                }
+
+                const datesToAssign = useCustomDates && selectedDates.length > 0 ? selectedDates : (() => {
+                  const project = projects.find(p => p.id === selectedProjectId)
+                  return project ? getDatesBetween(project.startDate, project.endDate) : []
+                })()
+
+                if (datesToAssign.length === 0) return
+
+                const unavailableWorkers = selectedWorkerIds.filter(workerId =>
+                  datesToAssign.some(date => assignments.some(a => a.workerId === workerId && a.date === date))
+                )
+
+                if (unavailableWorkers.length > 0) {
+                  const workerNames = unavailableWorkers.map(id => workers.find(w => w.id === id)?.name).join(', ')
+                  alert(`Los siguientes trabajadores no están disponibles: ${workerNames}`)
+                  return
+                }
+
+                selectedWorkerIds.forEach(workerId => {
+                  datesToAssign.forEach(date => assign(workerId, selectedProjectId, date))
+                })
+                
+                alert('Asignación realizada correctamente')
+                setShowAssignModal(false)
+                setSelectedWorkerIds([])
+                setSelectedDates([])
+                setUseCustomDates(false)
+              }} style={{padding: '0.75rem 1.5rem', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>Asignar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default App
+

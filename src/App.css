@@ -1,0 +1,339 @@
+#root {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(39, 174, 96, 0.1));
+  padding: 2rem;
+  border-radius: 16px;
+  border-left: 5px solid var(--primary);
+}
+
+.app-header h1 {
+  margin: 0;
+  background: linear-gradient(135deg, #3498db, #27ae60);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sections-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.section {
+  background: white;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+  border-top: 4px solid var(--primary);
+}
+
+.section:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.section h2 {
+  margin-top: 0;
+  color: var(--primary);
+  font-size: 1.3em;
+}
+
+.input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.input-group input,
+.input-group select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.input-group button {
+  flex-shrink: 0;
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.item-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.item-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.item-list::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 10px;
+}
+
+.item-list li {
+  background: #f8f9fa;
+  padding: 0.75rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 3px solid var(--primary);
+  transition: all 0.2s ease;
+}
+
+.item-list li:hover {
+  background: #ecf0f1;
+  border-left-color: var(--primary-dark);
+}
+
+.item-list button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85em;
+  margin-left: 0.5rem;
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+}
+
+.delete-btn:hover {
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3) !important;
+}
+
+.edit-btn {
+  background: linear-gradient(135deg, #3498db, #2980b9) !important;
+  color: white !important;
+}
+
+.edit-btn:hover {
+  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.3) !important;
+}
+
+.edit-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.edit-form input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.edit-form button {
+  flex-shrink: 0;
+  padding: 0.6rem 1rem;
+  font-size: 0.9em;
+}
+
+.checkbox-group {
+  border: 2px solid var(--light);
+  padding: 1rem;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #f8f9fa;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  transition: all 0.2s ease;
+}
+
+.checkbox-item:hover {
+  padding-left: 0.5rem;
+}
+
+.checkbox-item input {
+  width: auto;
+  margin-right: 0.75rem;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.checkbox-item label {
+  cursor: pointer;
+  margin: 0;
+  flex: 1;
+}
+
+.calendar-container {
+  background: white;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.calendar-container :deep(.fc) {
+  font-family: inherit;
+}
+
+.calendar-container :deep(.fc-button-primary) {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-radius: 8px !important;
+}
+
+.calendar-container :deep(.fc-button-primary:hover) {
+  background: var(--primary-dark) !important;
+}
+
+.calendar-container :deep(.fc-daygrid-day) {
+  border-radius: 4px;
+}
+
+.summary-section {
+  background: white;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  margin-top: 2rem;
+}
+
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: white;
+  border: 2px solid var(--primary);
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  animation: slideIn 0.2s ease;
+  white-space: pre-line;
+  text-align: left;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 1.5rem;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: var(--primary);
+  font-size: 1.5em;
+  text-align: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #root {
+    padding: 1rem;
+  }
+
+  .sections-container {
+    grid-template-columns: 1fr;
+  }
+
+  .input-group {
+    flex-direction: column;
+  }
+
+  .input-group input,
+  .input-group select,
+  .input-group button {
+    width: 100%;
+  }
+}
+
+/* Traffic light tooltips */
+.traffic-light-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
+  z-index: 1001;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+}
+
+.checkbox-item:hover .traffic-light-tooltip {
+  opacity: 1;
+}
