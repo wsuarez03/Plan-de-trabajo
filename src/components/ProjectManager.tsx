@@ -40,41 +40,43 @@ export default function ProjectManager({
   const [endDate, setEndDate] =
     useState('');
 
-  // =========================
-  // GENERAR COLOR ALEATORIO
-  // =========================
+    
+      // =========================
+      // GENERAR COLOR ALEATORIO
+      // =========================
+      
+      const generateRandomColor = () => {
+      
+        const colors = [
+      
+          '#2563eb',
+          '#dc2626',
+          '#16a34a',
+          '#9333ea',
+          '#ea580c',
+          '#0891b2',
+          '#be123c',
+          '#65a30d',
+          '#7c3aed',
+          '#0f766e',
+          '#c2410c',
+          '#1d4ed8',
+          '#15803d',
+          '#b91c1c',
+          '#7e22ce',
+          '#0369a1'
+        ];
+      
+        return colors[
+          Math.floor(
+            Math.random() * colors.length
+          )
+        ];
+      };
+      
+      const [color, setColor] =
+        useState(generateRandomColor());
 
-  const generateRandomColor = () => {
-
-    const colors = [
-
-      '#2563eb',
-      '#dc2626',
-      '#16a34a',
-      '#9333ea',
-      '#ea580c',
-      '#0891b2',
-      '#be123c',
-      '#65a30d',
-      '#7c3aed',
-      '#0f766e',
-      '#c2410c',
-      '#1d4ed8',
-      '#15803d',
-      '#b91c1c',
-      '#7e22ce',
-      '#0369a1'
-    ];
-
-    return colors[
-      Math.floor(
-        Math.random() * colors.length
-      )
-    ];
-  };
-
-  const [color, setColor] =
-    useState(generateRandomColor());
 
   // =========================
   // CARGAR DATOS AL EDITAR
