@@ -150,6 +150,13 @@ export default function ProjectManager({
         color
       };
 
+      const oldStart = editingProject.startDate;
+      const oldEnd = editingProject.endDate;
+      
+      const datesChanged =
+        oldStart !== startDate ||
+        oldEnd !== endDate;
+      
       const { error } = await supabase
 
         .from('projects')
@@ -183,6 +190,42 @@ export default function ProjectManager({
       setEditingProject(null);
 
     }
+
+      if (datesChanged) {
+
+  const { data: existingAssignments } =
+    await supabase
+      .from('assignments')
+      .select('*')
+      .eq('projectId', editingProject.id);
+
+  if (existingAssignments) {
+
+    const validAssignments =
+      existingAssignments.filter(a =>
+        a.date >= startDate &&
+        a.date <= endDate
+      );
+    const invalidAssignments =
+      existingAssignments.filter(a =>
+        a.date < startDate ||
+        a.date > endDate
+      );
+
+    if (invalidAssignments.length > 0) {
+
+      const invalidIds =
+        invalidAssignments.map(a => a.id);
+
+      await supabase
+        .from('assignments')
+        .delete()
+        .in('id', invalidIds);
+    }
+
+    setAssignments(validAssignments);
+  }
+}
 
     // =====================
     // CREAR
