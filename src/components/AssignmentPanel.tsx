@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import { supabase } from '../lib/supabase';
 
 import {
@@ -39,16 +40,20 @@ export default function AssignmentPanel({
   ] = useState('');
 
   // CLIENTE
+
   const [
     selectedClient,
     setSelectedClient
   ] = useState('');
 
-  // OBJETO / PROYECTO
+  // PROYECTO
+
   const [
     selectedProject,
     setSelectedProject
   ] = useState('');
+
+  // FECHAS
 
   const [
     selectedDates,
@@ -70,12 +75,13 @@ export default function AssignmentPanel({
   ];
 
   // =========================
-  // PROYECTOS DEL CLIENTE
+  // PROYECTOS CLIENTE
   // =========================
 
   const clientProjects =
     projects.filter(
       project =>
+
         project.information ===
         selectedClient
     );
@@ -126,7 +132,7 @@ export default function AssignmentPanel({
         projectId:
           project.id,
 
-        object: 
+        object:
           project.object ?? ''
       });
 
@@ -137,7 +143,7 @@ export default function AssignmentPanel({
   });
 
   // =========================
-  // CARGAR FECHAS EXISTENTES
+  // CARGAR FECHAS
   // =========================
 
   useEffect(() => {
@@ -155,8 +161,10 @@ export default function AssignmentPanel({
     const existingAssignments =
       assignments.filter(
         a =>
+
           a.workerId ===
             selectedWorker &&
+
           a.projectId ===
             selectedProject
       );
@@ -166,6 +174,7 @@ export default function AssignmentPanel({
     ) {
 
       setSelectedDates(
+
         existingAssignments.map(
           a => a.date
         )
@@ -176,9 +185,7 @@ export default function AssignmentPanel({
 
     const project =
       projects.find(
-        p =>
-          p.id ===
-          selectedProject
+        p => p.id === selectedProject
       );
 
     if (!project) {
@@ -199,6 +206,7 @@ export default function AssignmentPanel({
     while (current <= end) {
 
       dates.push(
+
         current
           .toISOString()
           .split('T')[0]
@@ -243,6 +251,8 @@ export default function AssignmentPanel({
         selectedProject
       );
 
+    // BLOQUEAR SI OCUPADO
+
     if (status === 'red') {
       return;
     }
@@ -268,38 +278,63 @@ export default function AssignmentPanel({
       ]);
     }
   };
-  // =========================
-  // Quitar asignación
-  // =========================
 
+  // =========================
+  // QUITAR ASIGNACIÓN
+  // =========================
 
   const removeAssignment = async (
-  workerId: string,
-  projectId: string,
-  date: string
-) => {
 
-  const { error } = await supabase
-    .from('assignments')
-    .delete()
-    .eq('workerId', workerId)
-    .eq('projectId', projectId)
-    .eq('date', date);
+    workerId: string,
 
-  if (error) {
-    console.error(error);
-    return;
-  }
-      setAssignments(prev =>
-    prev.filter(a => !(
-      a.workerId === workerId &&
-      a.projectId === projectId &&
-      a.date === date
-    ))
-  );
+    projectId: string,
 
-  alert('Asignación eliminada');
-};
+    date: string
+
+  ) => {
+
+    const { error } =
+      await supabase
+
+        .from('assignments')
+
+        .delete()
+
+        .eq('workerId', workerId)
+
+        .eq('projectId', projectId)
+
+        .eq('date', date);
+
+    if (error) {
+
+      console.error(error);
+
+      return;
+    }
+
+    setAssignments(prev =>
+
+      prev.filter(a => !(
+
+        a.workerId === workerId &&
+
+        a.projectId === projectId &&
+
+        a.date === date
+      ))
+    );
+
+    setSelectedDates(prev =>
+
+      prev.filter(d => d !== date)
+    );
+
+    alert(
+      'Asignación eliminada'
+    );
+  };
+
   // =========================
   // GUARDAR
   // =========================
@@ -308,14 +343,63 @@ export default function AssignmentPanel({
     async () => {
 
       if (
+
         !selectedWorker ||
+
         !selectedProject ||
+
         selectedDates.length === 0
       ) {
+
+        alert(
+          'Completa todos los campos'
+        );
+
         return;
       }
 
-      // borrar anteriores
+      // =========================
+      // VALIDAR CONFLICTOS
+      // =========================
+
+      const conflictingAssignments =
+
+        assignments.filter(a =>
+
+          a.workerId ===
+            selectedWorker &&
+
+          selectedDates.includes(
+            a.date
+          ) &&
+
+          a.projectId !==
+            selectedProject
+        );
+
+      if (
+        conflictingAssignments.length > 0
+      ) {
+
+        const dates =
+
+          conflictingAssignments
+
+            .map(a => a.date)
+
+            .join(', ');
+
+        alert(
+
+          `El trabajador ya está ocupado en: ${dates}`
+        );
+
+        return;
+      }
+
+      // =========================
+      // ELIMINAR ANTERIORES
+      // =========================
 
       const {
         error: deleteError
@@ -342,7 +426,9 @@ export default function AssignmentPanel({
         return;
       }
 
-      // insertar nuevas
+      // =========================
+      // INSERTAR NUEVAS
+      // =========================
 
       const orderedDates =
         [...selectedDates].sort();
@@ -375,6 +461,10 @@ export default function AssignmentPanel({
         return;
       }
 
+      // =========================
+      // ACTUALIZAR ESTADO
+      // =========================
+
       setAssignments(prev => {
 
         const filtered =
@@ -400,20 +490,18 @@ export default function AssignmentPanel({
       alert(
         'Asignaciones actualizadas'
       );
-                
-          // =========================
-          // LIMPIAR FORMULARIO
-          // =========================
-          
-          setSelectedWorker('');
-          
-          setSelectedClient('');
-          
-          setSelectedProject('');
-          
-          setSelectedDates([]);
-        
 
+      // =========================
+      // LIMPIAR FORMULARIO
+      // =========================
+
+      setSelectedWorker('');
+
+      setSelectedClient('');
+
+      setSelectedProject('');
+
+      setSelectedDates([]);
     };
 
   return (
@@ -433,6 +521,7 @@ export default function AssignmentPanel({
           value={selectedWorker}
 
           onChange={e =>
+
             setSelectedWorker(
               e.target.value
             )
@@ -489,13 +578,14 @@ export default function AssignmentPanel({
           ))}
         </select>
 
-        {/* OBJETO */}
+        {/* PROYECTO */}
 
         <select
 
           value={selectedProject}
 
           onChange={e =>
+
             setSelectedProject(
               e.target.value
             )
@@ -527,6 +617,7 @@ export default function AssignmentPanel({
       {projectDates.length > 0 && (
 
         <div
+
           style={{
 
             marginTop: '20px',
@@ -573,33 +664,31 @@ export default function AssignmentPanel({
 
                 style={{
 
+                  border: (() => {
 
-                border: (() => {
+                    const today =
+                      new Date()
+                        .toISOString()
+                        .split('T')[0];
 
-                  const today =
-                    new Date()
-                      .toISOString()
-                      .split('T')[0];
+                    const isExpired =
+                      item.date < today;
 
-                  const isExpired =
-                    item.date < today;
+                    if (isExpired) {
+                      return '2px solid #999';
+                    }
 
-                  if (isExpired) {
-                    return '2px solid #999';
-                  }
+                    if (status === 'red') {
+                      return '2px solid red';
+                    }
 
-                  if (status === 'red') {
-                    return '2px solid red';
-                  }
+                    if (status === 'yellow') {
+                      return '2px solid orange';
+                    }
 
-                  if (status === 'yellow') {
-                    return '2px solid orange';
-                  }
+                    return '2px solid green';
 
-                  return '2px solid green';
-
-                })(),
-
+                  })(),
 
                   borderRadius: '10px',
 
@@ -615,135 +704,130 @@ export default function AssignmentPanel({
                       ? 'not-allowed'
                       : 'pointer',
 
-                background: (() => {
+                  background: (() => {
 
-                  // proyecto vencido
-                  const today =
-                    new Date()
-                      .toISOString()
-                      .split('T')[0];
+                    const today =
+                      new Date()
+                        .toISOString()
+                        .split('T')[0];
 
-                  const isExpired =
-                    item.date < today;
+                    const isExpired =
+                      item.date < today;
 
-                  if (isExpired) {
-                    return '#e0e0e0';
-                  }
+                    if (isExpired) {
+                      return '#e0e0e0';
+                    }
 
-                  if (status === 'red') {
-                    return '#ffe5e5';
-                  }
+                    if (status === 'red') {
+                      return '#ffe5e5';
+                    }
 
-                  if (status === 'yellow') {
-                    return '#fff6d8';
-                  }
+                    if (status === 'yellow') {
+                      return '#fff6d8';
+                    }
 
-                  return '#e9ffe9';
+                    return '#e9ffe9';
 
-                })()
-
-
+                  })()
                 }}
               >
 
-              
-              <input
+                <input
 
-                type="checkbox"
+                  type="checkbox"
+
+                  checked={isChecked}
+
+                  disabled={
+                    isBlocked ||
+                    !selectedProject
+                  }
+
+                  onChange={() =>
+                    toggleDate(item.date)
+                  }
+                />
+
                 <button
 
                   type="button"
-                
+
                   onClick={() =>
-                
+
                     removeAssignment(
-                
+
                       selectedWorker,
-                
+
                       item.projectId,
-                
+
                       item.date
                     )
                   }
-                
+
                   style={{
-                
+
                     marginTop: '8px',
-                
+
                     background: '#ff4d4f',
-                
+
                     color: 'white',
-                
+
                     border: 'none',
-                
+
                     padding: '4px 8px',
-                
+
                     borderRadius: '6px',
-                
+
                     cursor: 'pointer',
-                
+
                     fontSize: '12px'
                   }}
                 >
                   Quitar
                 </button>
 
-                checked={isChecked}
+                {/* OBJETO */}
 
-                disabled={
-                  isBlocked ||
-                  !selectedProject
-                }
+                <div
+                  style={{
+                    fontWeight: 700,
+                    marginBottom: '6px',
+                    fontSize: '13px'
+                  }}
+                >
+                  {item.object}
+                </div>
 
-                onChange={() =>
-                  toggleDate(item.date)
-                }
-              />
+                {/* FECHA */}
 
-              {/* OBJETO */}
+                <div
+                  style={{
+                    marginTop: '6px',
+                    fontWeight: 600
+                  }}
+                >
+                  {item.date}
+                </div>
 
-              <div
-                style={{
-                  fontWeight: 700,
-                  marginBottom: '6px',
-                  fontSize: '13px'
-                }}
-              >
-                {item.object}
-              </div>
+                {/* ESTADO */}
 
-              {/* FECHA */}
+                <div
+                  style={{
+                    marginTop: '4px',
+                    fontSize: '12px'
+                  }}
+                >
 
-              <div
-                style={{
-                  marginTop: '6px',
-                  fontWeight: 600
-                }}
-              >
-                {item.date}
-              </div>
+                  {status === 'green' &&
+                    '🟢 Disponible'}
 
-              {/* ESTADO */}
+                  {status === 'yellow' &&
+                    '🟡 Viaje'}
 
-              <div
-                style={{
-                  marginTop: '4px',
-                  fontSize: '12px'
-                }}
-              >
+                  {status === 'red' &&
+                    '🔴 Ocupado'}
 
-                {status === 'green' &&
-                  '🟢 Disponible'}
-
-                {status === 'yellow' &&
-                  '🟡 Viaje'}
-
-                {status === 'red' &&
-                  '🔴 Ocupado'}
-
-              </div>
-
-
+                </div>
 
               </label>
             );
