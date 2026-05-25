@@ -268,7 +268,38 @@ export default function AssignmentPanel({
       ]);
     }
   };
+  // =========================
+  // Quitar asignación
+  // =========================
 
+
+  const removeAssignment = async (
+  workerId: string,
+  projectId: string,
+  date: string
+) => {
+
+  const { error } = await supabase
+    .from('assignments')
+    .delete()
+    .eq('workerId', workerId)
+    .eq('projectId', projectId)
+    .eq('date', date);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+      setAssignments(prev =>
+    prev.filter(a => !(
+      a.workerId === workerId &&
+      a.projectId === projectId &&
+      a.date === date
+    ))
+  );
+
+  alert('Asignación eliminada');
+};
   // =========================
   // GUARDAR
   // =========================
