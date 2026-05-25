@@ -650,6 +650,43 @@ export default function AssignmentPanel({
               <input
 
                 type="checkbox"
+                <button
+
+                  type="button"
+                
+                  onClick={() =>
+                
+                    removeAssignment(
+                
+                      selectedWorker,
+                
+                      item.projectId,
+                
+                      item.date
+                    )
+                  }
+                
+                  style={{
+                
+                    marginTop: '8px',
+                
+                    background: '#ff4d4f',
+                
+                    color: 'white',
+                
+                    border: 'none',
+                
+                    padding: '4px 8px',
+                
+                    borderRadius: '6px',
+                
+                    cursor: 'pointer',
+                
+                    fontSize: '12px'
+                  }}
+                >
+                  Quitar
+                </button>
 
                 checked={isChecked}
 
