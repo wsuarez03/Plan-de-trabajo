@@ -3,6 +3,7 @@ import { Project, Assignment } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface Props {
+
   projects: Project[];
 
   setProjects: React.Dispatch<
@@ -24,65 +25,72 @@ export default function ProjectManager({
 
   projects,
   setProjects,
+  setAssignments,
   editingProject,
   setEditingProject
 
-}: Props)
+}: Props) {
 
- {
+  const [
+    information,
+    setInformation
+  ] = useState('');
 
-  const [information, setInformation] =
-    useState('');
+  const [
+    object,
+    setObject
+  ] = useState('');
 
-  const [object, setObject] =
-    useState('');
+  const [
+    startDate,
+    setStartDate
+  ] = useState('');
 
-  const [startDate, setStartDate] =
-    useState('');
+  const [
+    endDate,
+    setEndDate
+  ] = useState('');
 
-  const [endDate, setEndDate] =
-    useState('');
+  // =========================
+  // PALETA ORDENADA
+  // =========================
 
-      
-      // =========================
-      // PALETA ORDENADA
-      // =========================
-      
-      const projectColors = [
-      
-        '#2563eb', // azul
-        '#dc2626', // rojo
-        '#16a34a', // verde
-        '#9333ea', // morado
-        '#ea580c', // naranja
-        '#0891b2', // cyan
-        '#be123c', // rosado
-        '#65a30d', // lima
-        '#7c3aed', // violeta
-        '#0f766e', // teal
-        '#c2410c', // naranja oscuro
-        '#1d4ed8', // azul fuerte
-        '#15803d', // verde oscuro
-        '#b91c1c', // rojo oscuro
-        '#7e22ce', // púrpura
-        '#0369a1'  // azul petróleo
-      ];
-      
-      // =========================
-      // COLOR AUTOMÁTICO ORDENADO
-      // =========================
-      
-      const getNextColor = () => {
-      
-        return projectColors[
-          projects.length %
-          projectColors.length
-        ];
-      };
-      
-      const [color, setColor] =
-        useState(getNextColor());
-      
+  const projectColors = [
+
+    '#2563eb',
+    '#dc2626',
+    '#16a34a',
+    '#9333ea',
+    '#ea580c',
+    '#0891b2',
+    '#be123c',
+    '#65a30d',
+    '#7c3aed',
+    '#0f766e',
+    '#c2410c',
+    '#1d4ed8',
+    '#15803d',
+    '#b91c1c',
+    '#7e22ce',
+    '#0369a1'
+  ];
+
+  // =========================
+  // COLOR AUTOMÁTICO
+  // =========================
+
+  const getNextColor = () => {
+
+    return projectColors[
+      projects.length %
+      projectColors.length
+    ];
+  };
+
+  const [
+    color,
+    setColor
+  ] = useState(getNextColor());
 
   // =========================
   // CARGAR DATOS AL EDITAR
@@ -109,7 +117,7 @@ export default function ProjectManager({
       );
 
       setColor(
-        editingProject.color || 
+        editingProject.color ||
         getNextColor()
       );
     }
@@ -123,11 +131,31 @@ export default function ProjectManager({
   const saveProject = async () => {
 
     if (
+
       !information ||
+
       !object ||
+
       !startDate ||
+
       !endDate
     ) {
+
+      alert(
+        'Completa todos los campos'
+      );
+
+      return;
+    }
+
+    // VALIDAR FECHAS
+
+    if (startDate > endDate) {
+
+      alert(
+        'La fecha inicio no puede ser mayor a la fecha fin'
+      );
+
       return;
     }
 
@@ -136,15 +164,22 @@ export default function ProjectManager({
     // =====================
 
     if (editingProject) {
-      const oldStart = editingProject.startDate;
 
-    const oldEnd = editingProject.endDate;
-    
-    const datesChanged =
-    
-      oldStart !== startDate ||
-    
-      oldEnd !== endDate;
+      // =====================
+      // VALIDAR CAMBIO FECHAS
+      // =====================
+
+      const oldStart =
+        editingProject.startDate;
+
+      const oldEnd =
+        editingProject.endDate;
+
+      const datesChanged =
+
+        oldStart !== startDate ||
+
+        oldEnd !== endDate;
 
       const updatedProject = {
 
@@ -158,88 +193,44 @@ export default function ProjectManager({
 
         color
       };
-      await supabase
-      .from('projects')
 
-      if (datesChanged) {
+      // =====================
+      // ACTUALIZAR PROYECTO
+      // =====================
 
-  const { data: existingAssignments } =
-    await supabase
+      const { error } =
+        await supabase
 
-      .from('assignments')
+          .from('projects')
 
-      .select('*')
+          .update(updatedProject)
 
-      .eq(
-        'projectId',
-        editingProject.id
-      );
-
-  if (existingAssignments) {
-
-    const validAssignments =
-      existingAssignments.filter(a =>
-
-        a.date >= startDate &&
-
-        a.date <= endDate
-      );
-
-    const invalidAssignments =
-      existingAssignments.filter(a =>
-
-        a.date < startDate ||
-
-        a.date > endDate
-      );
-
-    if (invalidAssignments.length > 0) {
-
-      const invalidIds =
-        invalidAssignments.map(
-          a => a.id
-        );
-
-      await supabase
-
-        .from('assignments')
-
-        .delete()
-
-        .in('id', invalidIds);
-    }
-
-    setAssignments(validAssignments);
-  }
-}
-
-      const oldStart = editingProject.startDate;
-      const oldEnd = editingProject.endDate;
-      
-      const datesChanged =
-        oldStart !== startDate ||
-        oldEnd !== endDate;
-      
-      const { error } = await supabase
-
-        .from('projects')
-
-        .update(updatedProject)
-
-        .eq('id', editingProject.id);
+          .eq(
+            'id',
+            editingProject.id
+          );
 
       if (error) {
 
         console.error(error);
 
+        alert(
+          'Error actualizando proyecto'
+        );
+
         return;
       }
+
+      // =====================
+      // ACTUALIZAR ESTADO LOCAL
+      // =====================
 
       setProjects(prev =>
 
         prev.map(project =>
 
-          project.id === editingProject.id
+          project.id ===
+          editingProject.id
 
             ? {
                 ...project,
@@ -250,45 +241,86 @@ export default function ProjectManager({
         )
       );
 
-      setEditingProject(null);
-
-    }
+      // =====================
+      // ACTUALIZAR ASIGNACIONES
+      // =====================
 
       if (datesChanged) {
 
-  const { data: existingAssignments } =
-    await supabase
-      .from('assignments')
-      .select('*')
-      .eq('projectId', editingProject.id);
+        const {
+          data: existingAssignments
+        } = await supabase
 
-  if (existingAssignments) {
+          .from('assignments')
 
-    const validAssignments =
-      existingAssignments.filter(a =>
-        a.date >= startDate &&
-        a.date <= endDate
+          .select('*')
+
+          .eq(
+            'projectId',
+            editingProject.id
+          );
+
+        if (existingAssignments) {
+
+          const validAssignments =
+
+            existingAssignments.filter(
+              a =>
+
+                a.date >= startDate &&
+
+                a.date <= endDate
+            );
+
+          const invalidAssignments =
+
+            existingAssignments.filter(
+              a =>
+
+                a.date < startDate ||
+
+                a.date > endDate
+            );
+
+          // ELIMINAR INVALIDAS
+
+          if (
+            invalidAssignments.length > 0
+          ) {
+
+            const invalidIds =
+
+              invalidAssignments.map(
+                a => a.id
+              );
+
+            await supabase
+
+              .from('assignments')
+
+              .delete()
+
+              .in(
+                'id',
+                invalidIds
+              );
+          }
+
+          // ACTUALIZAR ESTADO
+
+          setAssignments(
+            validAssignments
+          );
+        }
+      }
+
+      alert(
+        'Proyecto actualizado'
       );
-    const invalidAssignments =
-      existingAssignments.filter(a =>
-        a.date < startDate ||
-        a.date > endDate
-      );
 
-    if (invalidAssignments.length > 0) {
+      setEditingProject(null);
 
-      const invalidIds =
-        invalidAssignments.map(a => a.id);
-
-      await supabase
-        .from('assignments')
-        .delete()
-        .in('id', invalidIds);
     }
-
-    setAssignments(validAssignments);
-  }
-}
 
     // =====================
     // CREAR
@@ -309,7 +341,10 @@ export default function ProjectManager({
         color
       };
 
-      const { data, error } = await supabase
+      const {
+        data,
+        error
+      } = await supabase
 
         .from('projects')
 
@@ -322,6 +357,10 @@ export default function ProjectManager({
       if (error) {
 
         console.error(error);
+
+        alert(
+          'Error creando proyecto'
+        );
 
         return;
       }
@@ -336,6 +375,10 @@ export default function ProjectManager({
 
         data as Project
       ]);
+
+      alert(
+        'Proyecto creado'
+      );
     }
 
     // =====================
@@ -350,8 +393,9 @@ export default function ProjectManager({
 
     setEndDate('');
 
-    // nuevo color automático
-    setColor(getNextColor());
+    setColor(
+      getNextColor()
+    );
   };
 
   return (
@@ -381,6 +425,7 @@ export default function ProjectManager({
           value={information}
 
           onChange={e =>
+
             setInformation(
               e.target.value
             )
@@ -398,14 +443,16 @@ export default function ProjectManager({
           value={object}
 
           onChange={e =>
+
             setObject(
               e.target.value
             )
           }
         />
-
       </div>
+
       <div className="form-grid">
+
         {/* FECHA INICIO */}
 
         <input
@@ -415,6 +462,7 @@ export default function ProjectManager({
           value={startDate}
 
           onChange={e =>
+
             setStartDate(
               e.target.value
             )
@@ -430,14 +478,14 @@ export default function ProjectManager({
           value={endDate}
 
           onChange={e =>
+
             setEndDate(
               e.target.value
             )
           }
         />
 
-       
-        { /* BOTÓN */}
+        {/* BOTÓN */}
 
         <button onClick={saveProject}>
 
