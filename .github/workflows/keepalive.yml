@@ -13,5 +13,5 @@ jobs:
       - name: Call Supabase
         run: |
           curl -X GET \
-          "${{ secrets.SUPABASE_URL }}/rest/v1/equipos?select=id&limit=1" \
+          "${{ secrets.SUPABASE_URL }}/rest/v1/information?limit=1" \
           -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
